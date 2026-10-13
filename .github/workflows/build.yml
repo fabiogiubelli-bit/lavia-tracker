@@ -25,11 +25,20 @@ jobs:
           gradle-version: "8.14.3"
 
       - name: Test e build APK debug
-        run: gradle testDebugUnitTest assembleDebug --stacktrace
+        run: |
+          set -o pipefail
+          gradle testDebugUnitTest assembleDebug --stacktrace --console=plain 2>&1 | tee build.log
         env:
           # Opzionali: se assenti l'app chiede il token Mapbox al primo avvio.
           MAPBOX_PUBLIC_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
           MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}
+
+      - name: Riepilogo errori di build
+        if: failure()
+        run: |
+          grep -E "^e: |error:|What went wrong|Could not|Execution failed|Unresolved|FAILED|^> " build.log | head -40 > errors.txt || true
+          msg=$(head -c 6000 errors.txt | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')
+          echo "::error title=Errori Gradle::$msg"
 
       - name: Rinomina APK
         run: cp app/build/outputs/apk/debug/app-debug.apk lavia-tracker.apk
